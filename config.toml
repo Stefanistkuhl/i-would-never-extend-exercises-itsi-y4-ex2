@@ -1,0 +1,10 @@
+watch_dir = './data/captures/incoming'
+organized_dir = './data/captures/organized'
+archive_dir = './data/captures/archive'
+compression_enabled = true
+archive_days = 30
+max_retention_days = 90
+cleanup_interval_hours = 24
+batch_size = 10
+log_level = 'info'
+updated_at = 2025-11-01T22:33:42Z
