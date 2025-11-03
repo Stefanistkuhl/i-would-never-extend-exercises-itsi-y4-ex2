@@ -3,13 +3,13 @@ package config
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"reflect"
 	"strings"
 
 	"github.com/stefanistkuhl/i-would-never-extend-exercises-itsi-y4-ex2/pkg/db"
 	"github.com/stefanistkuhl/i-would-never-extend-exercises-itsi-y4-ex2/pkg/db/sqlc"
+	"github.com/stefanistkuhl/i-would-never-extend-exercises-itsi-y4-ex2/pkg/logger"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -60,17 +60,23 @@ func ReadConfigFromDB(q *sqlc.Queries) (Config, error) {
 	return cfg.FromDB(dbCfg), nil
 }
 
-func LoadAndCheckConfig() (Config, error) {
-	cfg, _ := ReadConfigFromFile("config.toml")
+func LoadAndCheckConfig(lg logger.Logger) (Config, error) {
+	cfg, readFileErr := ReadConfigFromFile("config.toml")
+	if readFileErr != nil {
+		lg.Fatal("Failed to read config from file", "error", readFileErr)
+	}
 	s, err := db.InitIfNeeded()
 	if err != nil {
-		log.Fatal(err)
+		lg.Fatal("Failed to initialize database", "error", err)
 	}
-	dbCfg, _ := ReadConfigFromDB(s.Queries)
+	dbCfg, readErr := ReadConfigFromDB(s.Queries)
+	if readErr != nil {
+		lg.Fatal("Failed to read config from db", "error", readErr)
+	}
 
 	diffs := diffConfigs(cfg, dbCfg)
 	if len(diffs) == 0 {
-		return cfg, err
+		return cfg, nil
 	}
 
 	fmt.Printf("Found %d config difference(s)\n", len(diffs))
@@ -78,12 +84,15 @@ func LoadAndCheckConfig() (Config, error) {
 	cfg, source := chooseConfig(cfg, dbCfg, diffs)
 	switch source {
 	case ConfigSourceFile:
-		s.Queries.UpdateConfig(context.Background(), cfg.ToUpdateParams())
+		updateErr := s.Queries.UpdateConfig(context.Background(), cfg.ToUpdateParams())
+		if updateErr != nil {
+			return Config{}, fmt.Errorf("failed to update config in db: %w", updateErr)
+		}
 	case ConfigSourceDB:
 		WriteConfig(dbCfg, "config.toml")
 	}
 
-	return cfg, err
+	return cfg, nil
 }
 
 func diffConfigs(fileCfg, dbCfg Config) []ConfigDiff {
@@ -179,10 +188,7 @@ func printConfigFormatted(cfg Config, diffFields map[string]bool) {
 		{"Compression Enabled", cfg.CompressionEnabled},
 		{"Archive Days", cfg.ArchiveDays},
 		{"Max Retention Days", cfg.MaxRetentionDays},
-		{"Cleanup Interval Hours", cfg.CleanupIntervalHrs},
-		{"Batch Size", cfg.BatchSize},
 		{"Log Level", cfg.LogLevel},
-		{"Updated At", cfg.UpdatedAt.Format("2006-01-02 15:04:05")},
 	}
 
 	for _, f := range fields {

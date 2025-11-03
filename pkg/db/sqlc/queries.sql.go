@@ -11,8 +11,91 @@ import (
 	"time"
 )
 
+const deleteCapture = `-- name: DeleteCapture :exec
+DELETE FROM captures
+WHERE id = ?
+`
+
+func (q *Queries) DeleteCapture(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteCapture, id)
+	return err
+}
+
+const getCapturesForArchive = `-- name: GetCapturesForArchive :many
+SELECT id, file_path, file_size
+FROM captures
+WHERE archived = 0
+  AND capture_datetime < datetime('now', ?)
+ORDER BY capture_datetime ASC
+`
+
+type GetCapturesForArchiveRow struct {
+	ID       int64
+	FilePath string
+	FileSize int64
+}
+
+func (q *Queries) GetCapturesForArchive(ctx context.Context, datetime interface{}) ([]GetCapturesForArchiveRow, error) {
+	rows, err := q.db.QueryContext(ctx, getCapturesForArchive, datetime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetCapturesForArchiveRow
+	for rows.Next() {
+		var i GetCapturesForArchiveRow
+		if err := rows.Scan(&i.ID, &i.FilePath, &i.FileSize); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCapturesForArchiveWithLimit = `-- name: GetCapturesForArchiveWithLimit :many
+SELECT id, file_path
+FROM captures
+WHERE archived = 0
+  AND capture_datetime < datetime('now', ?)
+ORDER BY capture_datetime ASC
+`
+
+type GetCapturesForArchiveWithLimitRow struct {
+	ID       int64
+	FilePath string
+}
+
+func (q *Queries) GetCapturesForArchiveWithLimit(ctx context.Context, datetime interface{}) ([]GetCapturesForArchiveWithLimitRow, error) {
+	rows, err := q.db.QueryContext(ctx, getCapturesForArchiveWithLimit, datetime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetCapturesForArchiveWithLimitRow
+	for rows.Next() {
+		var i GetCapturesForArchiveWithLimitRow
+		if err := rows.Scan(&i.ID, &i.FilePath); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getConfig = `-- name: GetConfig :one
-SELECT watch_dir, organized_dir, archive_dir, compression_enabled, archive_days, max_retention_days, cleanup_interval_hours, batch_size, log_level, updated_at FROM config LIMIT 1
+SELECT watch_dir, organized_dir, archive_dir, compression_enabled, archive_days, max_retention_days, log_level FROM config LIMIT 1
 `
 
 func (q *Queries) GetConfig(ctx context.Context) (Config, error) {
@@ -25,12 +108,83 @@ func (q *Queries) GetConfig(ctx context.Context) (Config, error) {
 		&i.CompressionEnabled,
 		&i.ArchiveDays,
 		&i.MaxRetentionDays,
-		&i.CleanupIntervalHours,
-		&i.BatchSize,
 		&i.LogLevel,
-		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getOldArchivedCaptures = `-- name: GetOldArchivedCaptures :many
+SELECT id, file_path
+FROM captures
+WHERE archived = 1
+  AND capture_datetime < datetime('now', ?)
+ORDER BY capture_datetime ASC
+`
+
+type GetOldArchivedCapturesRow struct {
+	ID       int64
+	FilePath string
+}
+
+func (q *Queries) GetOldArchivedCaptures(ctx context.Context, datetime interface{}) ([]GetOldArchivedCapturesRow, error) {
+	rows, err := q.db.QueryContext(ctx, getOldArchivedCaptures, datetime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetOldArchivedCapturesRow
+	for rows.Next() {
+		var i GetOldArchivedCapturesRow
+		if err := rows.Scan(&i.ID, &i.FilePath); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPendingCompressions = `-- name: GetPendingCompressions :many
+SELECT id, file_path, file_size
+FROM captures
+WHERE compressed = 0
+  AND archived = 0
+ORDER BY capture_datetime ASC
+LIMIT ?
+`
+
+type GetPendingCompressionsRow struct {
+	ID       int64
+	FilePath string
+	FileSize int64
+}
+
+func (q *Queries) GetPendingCompressions(ctx context.Context, limit int64) ([]GetPendingCompressionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getPendingCompressions, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPendingCompressionsRow
+	for rows.Next() {
+		var i GetPendingCompressionsRow
+		if err := rows.Scan(&i.ID, &i.FilePath, &i.FileSize); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const insertCapture = `-- name: InsertCapture :one
@@ -86,17 +240,18 @@ INSERT INTO capture_stats (
     protocol_distribution,
     top_src_ips,
     top_dst_ips,
-    top_ports,
+    top_tcp_src_ports,
+    top_tcp_dst_ports,
+    top_udp_src_ports,
+    top_udp_dst_ports,
     packet_rate,
     avg_packet_size,
-    tls_versions,
-    dns_queries,
     duration_seconds,
     first_packet_time,
     last_packet_time
-    ) VALUES (
-    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-    )
+) VALUES (
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+)
 `
 
 type InsertCaptureStatsParams struct {
@@ -105,11 +260,12 @@ type InsertCaptureStatsParams struct {
 	ProtocolDistribution sql.NullString
 	TopSrcIps            sql.NullString
 	TopDstIps            sql.NullString
-	TopPorts             sql.NullString
+	TopTcpSrcPorts       sql.NullString
+	TopTcpDstPorts       sql.NullString
+	TopUdpSrcPorts       sql.NullString
+	TopUdpDstPorts       sql.NullString
 	PacketRate           sql.NullFloat64
 	AvgPacketSize        sql.NullFloat64
-	TlsVersions          sql.NullString
-	DnsQueries           sql.NullInt64
 	DurationSeconds      sql.NullInt64
 	FirstPacketTime      sql.NullTime
 	LastPacketTime       sql.NullTime
@@ -122,15 +278,38 @@ func (q *Queries) InsertCaptureStats(ctx context.Context, arg InsertCaptureStats
 		arg.ProtocolDistribution,
 		arg.TopSrcIps,
 		arg.TopDstIps,
-		arg.TopPorts,
+		arg.TopTcpSrcPorts,
+		arg.TopTcpDstPorts,
+		arg.TopUdpSrcPorts,
+		arg.TopUdpDstPorts,
 		arg.PacketRate,
 		arg.AvgPacketSize,
-		arg.TlsVersions,
-		arg.DnsQueries,
 		arg.DurationSeconds,
 		arg.FirstPacketTime,
 		arg.LastPacketTime,
 	)
+	return err
+}
+
+const markCaptureAsArchived = `-- name: MarkCaptureAsArchived :exec
+UPDATE captures
+SET archived = 1, updated_at = current_timestamp
+WHERE id = ?
+`
+
+func (q *Queries) MarkCaptureAsArchived(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, markCaptureAsArchived, id)
+	return err
+}
+
+const markCaptureAsCompressed = `-- name: MarkCaptureAsCompressed :exec
+UPDATE captures
+SET compressed = 1, updated_at = current_timestamp
+WHERE id = ?
+`
+
+func (q *Queries) MarkCaptureAsCompressed(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, markCaptureAsCompressed, id)
 	return err
 }
 
@@ -142,22 +321,17 @@ archive_dir = ?,
 compression_enabled = ?,
 archive_days = ?,
 max_retention_days = ?,
-cleanup_interval_hours = ?,
-batch_size = ?,
-log_level = ?,
-updated_at = current_timestamp
+log_level = ?
 `
 
 type UpdateConfigParams struct {
-	WatchDir             sql.NullString
-	OrganizedDir         sql.NullString
-	ArchiveDir           sql.NullString
-	CompressionEnabled   sql.NullBool
-	ArchiveDays          sql.NullInt64
-	MaxRetentionDays     sql.NullInt64
-	CleanupIntervalHours sql.NullInt64
-	BatchSize            sql.NullInt64
-	LogLevel             sql.NullString
+	WatchDir           sql.NullString
+	OrganizedDir       sql.NullString
+	ArchiveDir         sql.NullString
+	CompressionEnabled sql.NullBool
+	ArchiveDays        sql.NullInt64
+	MaxRetentionDays   sql.NullInt64
+	LogLevel           sql.NullString
 }
 
 func (q *Queries) UpdateConfig(ctx context.Context, arg UpdateConfigParams) error {
@@ -168,9 +342,23 @@ func (q *Queries) UpdateConfig(ctx context.Context, arg UpdateConfigParams) erro
 		arg.CompressionEnabled,
 		arg.ArchiveDays,
 		arg.MaxRetentionDays,
-		arg.CleanupIntervalHours,
-		arg.BatchSize,
 		arg.LogLevel,
 	)
+	return err
+}
+
+const updateFilePath = `-- name: UpdateFilePath :exec
+UPDATE captures
+SET file_path = ?, updated_at = current_timestamp
+WHERE id = ?
+`
+
+type UpdateFilePathParams struct {
+	FilePath string
+	ID       int64
+}
+
+func (q *Queries) UpdateFilePath(ctx context.Context, arg UpdateFilePathParams) error {
+	_, err := q.db.ExecContext(ctx, updateFilePath, arg.FilePath, arg.ID)
 	return err
 }

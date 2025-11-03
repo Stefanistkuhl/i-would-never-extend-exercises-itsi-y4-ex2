@@ -16,17 +16,22 @@ type CaptureStats struct {
 	ProtocolDistribution map[string]int `json:"protocol_distribution"`
 	TopSrcIPs            map[string]int `json:"top_src_ips"`
 	TopDstIPs            map[string]int `json:"top_dst_ips"`
-	TopPorts             map[uint16]int `json:"top_ports"`
-	PacketRate           float64        `json:"packet_rate"`
-	AvgPacketSize        float64        `json:"avg_packet_size"`
-	TLSVersions          map[string]int `json:"tls_versions"`
-	DNSQueries           int            `json:"dns_queries"`
-	DurationSeconds      int64          `json:"duration_seconds"`
-	FirstPacketTime      time.Time      `json:"first_packet_time"`
-	LastPacketTime       time.Time      `json:"last_packet_time"`
+
+	TopTCPSrcPorts map[uint16]int `json:"top_tcp_src_ports"`
+	TopTCPDstPorts map[uint16]int `json:"top_tcp_dst_ports"`
+	TopUDPSrcPorts map[uint16]int `json:"top_udp_src_ports"`
+	TopUDPDstPorts map[uint16]int `json:"top_udp_dst_ports"`
+
+	PacketRate      float64   `json:"packet_rate"`
+	AvgPacketSize   float64   `json:"avg_packet_size"`
+	DurationSeconds int64     `json:"duration_seconds"`
+	FirstPacketTime time.Time `json:"first_packet_time"`
+	LastPacketTime  time.Time `json:"last_packet_time"`
 }
 
 func AnalyzeCaptureFile(cfg config.Config, filePath string) (CaptureStats, error) {
+	_ = cfg
+
 	handle, err := pcap.OpenOffline(filePath)
 	if err != nil {
 		return CaptureStats{}, fmt.Errorf("failed to open pcap: %w", err)
@@ -37,8 +42,10 @@ func AnalyzeCaptureFile(cfg config.Config, filePath string) (CaptureStats, error
 		ProtocolDistribution: make(map[string]int),
 		TopSrcIPs:            make(map[string]int),
 		TopDstIPs:            make(map[string]int),
-		TopPorts:             make(map[uint16]int),
-		TLSVersions:          make(map[string]int),
+		TopTCPSrcPorts:       make(map[uint16]int),
+		TopTCPDstPorts:       make(map[uint16]int),
+		TopUDPSrcPorts:       make(map[uint16]int),
+		TopUDPDstPorts:       make(map[uint16]int),
 	}
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
@@ -47,13 +54,14 @@ func AnalyzeCaptureFile(cfg config.Config, filePath string) (CaptureStats, error
 	var firstTime, lastTime time.Time
 
 	for packet := range packetSource.Packets() {
+		ci := packet.Metadata().CaptureInfo
 		if firstTime.IsZero() {
-			firstTime = packet.Metadata().Timestamp
+			firstTime = ci.Timestamp
 		}
-		lastTime = packet.Metadata().Timestamp
+		lastTime = ci.Timestamp
 
 		totalPackets++
-		totalBytes += int64(len(packet.Data()))
+		totalBytes += int64(ci.Length)
 
 		if ipv4Layer := packet.Layer(layers.LayerTypeIPv4); ipv4Layer != nil {
 			ipv4 := ipv4Layer.(*layers.IPv4)
@@ -72,26 +80,15 @@ func AnalyzeCaptureFile(cfg config.Config, filePath string) (CaptureStats, error
 		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 			tcp := tcpLayer.(*layers.TCP)
 			stats.ProtocolDistribution["TCP"]++
-			stats.TopPorts[uint16(tcp.DstPort)]++
-
-			if tcp.DstPort == 443 {
-				stats.TLSVersions[detectTLSVersion(packet)]++
-			}
+			stats.TopTCPDstPorts[uint16(tcp.DstPort)]++
+			stats.TopTCPSrcPorts[uint16(tcp.SrcPort)]++
 		}
 
 		if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
 			udp := udpLayer.(*layers.UDP)
 			stats.ProtocolDistribution["UDP"]++
-			stats.TopPorts[uint16(udp.DstPort)]++
-
-			if udp.DstPort == 53 {
-				if dnsLayer := packet.Layer(layers.LayerTypeDNS); dnsLayer != nil {
-					dns := dnsLayer.(*layers.DNS)
-					if !dns.QR {
-						stats.DNSQueries++
-					}
-				}
-			}
+			stats.TopUDPDstPorts[uint16(udp.DstPort)]++
+			stats.TopUDPSrcPorts[uint16(udp.SrcPort)]++
 		}
 
 		if packet.Layer(layers.LayerTypeICMPv4) != nil {
@@ -104,42 +101,21 @@ func AnalyzeCaptureFile(cfg config.Config, filePath string) (CaptureStats, error
 
 	stats.FirstPacketTime = firstTime
 	stats.LastPacketTime = lastTime
-	stats.DurationSeconds = int64(lastTime.Sub(firstTime).Seconds())
+
+	dur := lastTime.Sub(firstTime)
+	dur = max(dur, 0)
+	stats.DurationSeconds = int64(dur.Seconds())
 	stats.TotalPackets = totalPackets
 
 	if totalPackets > 0 {
 		stats.AvgPacketSize = float64(totalBytes) / float64(totalPackets)
 	}
 
-	if stats.DurationSeconds > 0 {
-		stats.PacketRate = float64(totalPackets) / float64(stats.DurationSeconds)
+	if dur > 0 {
+		stats.PacketRate = float64(totalPackets) / dur.Seconds()
+	} else {
+		stats.PacketRate = float64(totalPackets)
 	}
 
 	return stats, nil
-}
-
-func detectTLSVersion(packet gopacket.Packet) string {
-	appLayer := packet.ApplicationLayer()
-	if appLayer == nil {
-		return "Unknown"
-	}
-
-	payload := appLayer.Payload()
-	if len(payload) < 5 || payload[0] != 0x16 {
-		return "Unknown"
-	}
-
-	version := (int(payload[1]) << 8) | int(payload[2])
-	switch version {
-	case 0x0301:
-		return "TLS1.0"
-	case 0x0302:
-		return "TLS1.1"
-	case 0x0303:
-		return "TLS1.2"
-	case 0x0304:
-		return "TLS1.3"
-	default:
-		return "Unknown"
-	}
 }

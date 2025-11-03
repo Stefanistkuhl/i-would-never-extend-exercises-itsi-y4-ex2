@@ -29,11 +29,12 @@ type CaptureStat struct {
 	ProtocolDistribution sql.NullString
 	TopSrcIps            sql.NullString
 	TopDstIps            sql.NullString
-	TopPorts             sql.NullString
+	TopTcpSrcPorts       sql.NullString
+	TopTcpDstPorts       sql.NullString
+	TopUdpSrcPorts       sql.NullString
+	TopUdpDstPorts       sql.NullString
 	PacketRate           sql.NullFloat64
 	AvgPacketSize        sql.NullFloat64
-	TlsVersions          sql.NullString
-	DnsQueries           sql.NullInt64
 	DurationSeconds      sql.NullInt64
 	FirstPacketTime      sql.NullTime
 	LastPacketTime       sql.NullTime
@@ -41,14 +42,11 @@ type CaptureStat struct {
 }
 
 type Config struct {
-	WatchDir             sql.NullString
-	OrganizedDir         sql.NullString
-	ArchiveDir           sql.NullString
-	CompressionEnabled   sql.NullBool
-	ArchiveDays          sql.NullInt64
-	MaxRetentionDays     sql.NullInt64
-	CleanupIntervalHours sql.NullInt64
-	BatchSize            sql.NullInt64
-	LogLevel             sql.NullString
-	UpdatedAt            sql.NullTime
+	WatchDir           sql.NullString
+	OrganizedDir       sql.NullString
+	ArchiveDir         sql.NullString
+	CompressionEnabled sql.NullBool
+	ArchiveDays        sql.NullInt64
+	MaxRetentionDays   sql.NullInt64
+	LogLevel           sql.NullString
 }

@@ -1,22 +1,20 @@
 package sorter
 
 import (
-	"log"
 	"sync"
 	"time"
 
 	"github.com/stefanistkuhl/i-would-never-extend-exercises-itsi-y4-ex2/pkg/config"
+	"github.com/stefanistkuhl/i-would-never-extend-exercises-itsi-y4-ex2/pkg/logger"
 
 	"github.com/fsnotify/fsnotify"
 )
 
-var timer *time.Timer
-
-func Watcher(cfg config.Config, logger *log.Logger) {
-	logger.Println("INFO: Watching for changes in", cfg.WatchDir)
+func Watcher(cfg config.Config, logger logger.Logger) {
+	logger.Info("Watching for changes", "directory", cfg.WatchDir)
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("Failed to create file watcher", "error", err)
 	}
 
 	fileTimers := make(map[string]*time.Timer)
@@ -37,7 +35,7 @@ func Watcher(cfg config.Config, logger *log.Logger) {
 						quietTimeout,
 						func() {
 							if cfg.LogLevel == "info" {
-								logger.Println("INFO: File finished:", event.Name)
+								logger.Info("File finished writing", "file", event.Name)
 							}
 							mu.Lock()
 							delete(fileTimers, event.Name)
@@ -53,14 +51,14 @@ func Watcher(cfg config.Config, logger *log.Logger) {
 				if !ok {
 					return
 				}
-				logger.Println("ERROR:", err)
+				logger.Error("File watcher error", "error", err)
 			}
 		}
 	}()
 
 	err = watcher.Add(cfg.WatchDir)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("Failed to add watch directory", "path", cfg.WatchDir, "error", err)
 	}
 
 	<-make(chan struct{})
