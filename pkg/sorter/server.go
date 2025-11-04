@@ -124,6 +124,11 @@ func startHTTPServer(lg logger.Logger, cfg config.Config) {
 		r.Post("/query", s.QuerySQLHandler)
 	}
 
+	// Export Endpoints
+	exportRoutes := func(r chi.Router) {
+		r.Get("/export", s.ExportStoreHandler)
+	}
+
 	r.Route("/api", func(r chi.Router) {
 		statusRoutes(r)
 		fileRoutes(r)
@@ -133,6 +138,7 @@ func startHTTPServer(lg logger.Logger, cfg config.Config) {
 		statsRoutes(r)
 		compressionRoutes(r)
 		searchRoutes(r)
+		exportRoutes(r)
 	})
 
 	if cfg.LogLevel == "info" {
