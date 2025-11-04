@@ -1,7 +1,12 @@
 version: "2"
 sql:
   - engine: "sqlite"
-    queries: "./pkg/db/queries.sql"
+    queries: 
+      - "./pkg/db/config.sql"
+      - "./pkg/db/inserts.sql"
+      - "./pkg/db/selects.sql"
+      - "./pkg/db/updates.sql"
+      - "./pkg/db/deletes.sql"
     schema: "./pkg/db/schema.sql"
     gen:
       go:
