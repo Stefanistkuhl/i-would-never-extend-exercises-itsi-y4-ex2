@@ -4,6 +4,6 @@ archive_dir = './data/captures/archive'
 expose_service = true
 port = 1234
 compression_enabled = true
-archive_days = 1
+archive_days = 30
 max_retention_days = 90
 log_level = 'info'

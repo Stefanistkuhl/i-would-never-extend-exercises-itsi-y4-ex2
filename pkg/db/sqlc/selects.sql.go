@@ -7,7 +7,88 @@ package sqlc
 
 import (
 	"context"
+	"database/sql"
+	"time"
 )
+
+const getArchiveBrief = `-- name: GetArchiveBrief :many
+SELECT id, file_path, file_size, created_at, updated_at FROM captures WHERE archived = 1
+`
+
+type GetArchiveBriefRow struct {
+	ID        int64
+	FilePath  string
+	FileSize  int64
+	CreatedAt sql.NullTime
+	UpdatedAt sql.NullTime
+}
+
+func (q *Queries) GetArchiveBrief(ctx context.Context) ([]GetArchiveBriefRow, error) {
+	rows, err := q.db.QueryContext(ctx, getArchiveBrief)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetArchiveBriefRow
+	for rows.Next() {
+		var i GetArchiveBriefRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FilePath,
+			&i.FileSize,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getArchviedCaptures = `-- name: GetArchviedCaptures :many
+SELECT id, hostname, scenario, capture_datetime, file_path, file_size, compressed, archived, created_at, updated_at FROM captures WHERE archived = 1
+`
+
+func (q *Queries) GetArchviedCaptures(ctx context.Context) ([]Capture, error) {
+	rows, err := q.db.QueryContext(ctx, getArchviedCaptures)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Capture
+	for rows.Next() {
+		var i Capture
+		if err := rows.Scan(
+			&i.ID,
+			&i.Hostname,
+			&i.Scenario,
+			&i.CaptureDatetime,
+			&i.FilePath,
+			&i.FileSize,
+			&i.Compressed,
+			&i.Archived,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const getCapture = `-- name: GetCapture :one
 SELECT id, hostname, scenario, capture_datetime, file_path, file_size, compressed, archived, created_at, updated_at FROM captures WHERE id = ?
@@ -31,12 +112,146 @@ func (q *Queries) GetCapture(ctx context.Context, id int64) (Capture, error) {
 	return i, err
 }
 
+const getCaptureStatsByID = `-- name: GetCaptureStatsByID :one
+SELECT cs.id, cs.packet_count, cs.capture_id, cs.protocol_distribution, cs.top_src_ips, cs.top_dst_ips, cs.top_tcp_src_ports, cs.top_tcp_dst_ports, cs.top_udp_src_ports, cs.top_udp_dst_ports, cs.packet_rate, cs.avg_packet_size, cs.duration_seconds, cs.first_packet_time, cs.last_packet_time, cs.created_at, c.hostname, c.scenario, c.capture_datetime, c.file_path
+FROM captures c
+LEFT JOIN capture_stats cs ON c.id = cs.capture_id
+WHERE c.id = ?
+`
+
+type GetCaptureStatsByIDRow struct {
+	ID                   sql.NullInt64
+	PacketCount          sql.NullInt64
+	CaptureID            sql.NullInt64
+	ProtocolDistribution sql.NullString
+	TopSrcIps            sql.NullString
+	TopDstIps            sql.NullString
+	TopTcpSrcPorts       sql.NullString
+	TopTcpDstPorts       sql.NullString
+	TopUdpSrcPorts       sql.NullString
+	TopUdpDstPorts       sql.NullString
+	PacketRate           sql.NullFloat64
+	AvgPacketSize        sql.NullFloat64
+	DurationSeconds      sql.NullInt64
+	FirstPacketTime      sql.NullTime
+	LastPacketTime       sql.NullTime
+	CreatedAt            sql.NullTime
+	Hostname             string
+	Scenario             string
+	CaptureDatetime      time.Time
+	FilePath             string
+}
+
+func (q *Queries) GetCaptureStatsByID(ctx context.Context, id int64) (GetCaptureStatsByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getCaptureStatsByID, id)
+	var i GetCaptureStatsByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.PacketCount,
+		&i.CaptureID,
+		&i.ProtocolDistribution,
+		&i.TopSrcIps,
+		&i.TopDstIps,
+		&i.TopTcpSrcPorts,
+		&i.TopTcpDstPorts,
+		&i.TopUdpSrcPorts,
+		&i.TopUdpDstPorts,
+		&i.PacketRate,
+		&i.AvgPacketSize,
+		&i.DurationSeconds,
+		&i.FirstPacketTime,
+		&i.LastPacketTime,
+		&i.CreatedAt,
+		&i.Hostname,
+		&i.Scenario,
+		&i.CaptureDatetime,
+		&i.FilePath,
+	)
+	return i, err
+}
+
 const getCaptures = `-- name: GetCaptures :many
 SELECT id, hostname, scenario, capture_datetime, file_path, file_size, compressed, archived, created_at, updated_at FROM captures
 `
 
 func (q *Queries) GetCaptures(ctx context.Context) ([]Capture, error) {
 	rows, err := q.db.QueryContext(ctx, getCaptures)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Capture
+	for rows.Next() {
+		var i Capture
+		if err := rows.Scan(
+			&i.ID,
+			&i.Hostname,
+			&i.Scenario,
+			&i.CaptureDatetime,
+			&i.FilePath,
+			&i.FileSize,
+			&i.Compressed,
+			&i.Archived,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCapturesByHostname = `-- name: GetCapturesByHostname :many
+SELECT id, hostname, scenario, capture_datetime, file_path, file_size, compressed, archived, created_at, updated_at FROM captures WHERE hostname = ? ORDER BY capture_datetime DESC
+`
+
+func (q *Queries) GetCapturesByHostname(ctx context.Context, hostname string) ([]Capture, error) {
+	rows, err := q.db.QueryContext(ctx, getCapturesByHostname, hostname)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Capture
+	for rows.Next() {
+		var i Capture
+		if err := rows.Scan(
+			&i.ID,
+			&i.Hostname,
+			&i.Scenario,
+			&i.CaptureDatetime,
+			&i.FilePath,
+			&i.FileSize,
+			&i.Compressed,
+			&i.Archived,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCapturesByScenario = `-- name: GetCapturesByScenario :many
+SELECT id, hostname, scenario, capture_datetime, file_path, file_size, compressed, archived, created_at, updated_at FROM captures WHERE scenario = ? ORDER BY capture_datetime DESC
+`
+
+func (q *Queries) GetCapturesByScenario(ctx context.Context, scenario string) ([]Capture, error) {
+	rows, err := q.db.QueryContext(ctx, getCapturesByScenario, scenario)
 	if err != nil {
 		return nil, err
 	}
@@ -216,4 +431,160 @@ func (q *Queries) GetPendingCompressions(ctx context.Context, limit int64) ([]Ge
 		return nil, err
 	}
 	return items, nil
+}
+
+const getStatsByHostname = `-- name: GetStatsByHostname :many
+SELECT 
+    c.hostname,
+    COUNT(DISTINCT c.id) as capture_count,
+    SUM(c.file_size) as total_file_size,
+    SUM(COALESCE(cs.packet_count, 0)) as total_packets,
+    AVG(COALESCE(cs.packet_rate, 0)) as avg_packet_rate,
+    AVG(COALESCE(cs.avg_packet_size, 0)) as avg_packet_size,
+    SUM(COALESCE(cs.duration_seconds, 0)) as total_duration_seconds
+FROM captures c
+LEFT JOIN capture_stats cs ON c.id = cs.capture_id
+GROUP BY c.hostname
+ORDER BY c.hostname
+`
+
+type GetStatsByHostnameRow struct {
+	Hostname             string
+	CaptureCount         int64
+	TotalFileSize        sql.NullFloat64
+	TotalPackets         sql.NullFloat64
+	AvgPacketRate        sql.NullFloat64
+	AvgPacketSize        sql.NullFloat64
+	TotalDurationSeconds sql.NullFloat64
+}
+
+func (q *Queries) GetStatsByHostname(ctx context.Context) ([]GetStatsByHostnameRow, error) {
+	rows, err := q.db.QueryContext(ctx, getStatsByHostname)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetStatsByHostnameRow
+	for rows.Next() {
+		var i GetStatsByHostnameRow
+		if err := rows.Scan(
+			&i.Hostname,
+			&i.CaptureCount,
+			&i.TotalFileSize,
+			&i.TotalPackets,
+			&i.AvgPacketRate,
+			&i.AvgPacketSize,
+			&i.TotalDurationSeconds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStatsByScenario = `-- name: GetStatsByScenario :many
+SELECT 
+    c.scenario,
+    COUNT(DISTINCT c.id) as capture_count,
+    SUM(c.file_size) as total_file_size,
+    SUM(COALESCE(cs.packet_count, 0)) as total_packets,
+    AVG(COALESCE(cs.packet_rate, 0)) as avg_packet_rate,
+    AVG(COALESCE(cs.avg_packet_size, 0)) as avg_packet_size,
+    SUM(COALESCE(cs.duration_seconds, 0)) as total_duration_seconds
+FROM captures c
+LEFT JOIN capture_stats cs ON c.id = cs.capture_id
+GROUP BY c.scenario
+ORDER BY c.scenario
+`
+
+type GetStatsByScenarioRow struct {
+	Scenario             string
+	CaptureCount         int64
+	TotalFileSize        sql.NullFloat64
+	TotalPackets         sql.NullFloat64
+	AvgPacketRate        sql.NullFloat64
+	AvgPacketSize        sql.NullFloat64
+	TotalDurationSeconds sql.NullFloat64
+}
+
+func (q *Queries) GetStatsByScenario(ctx context.Context) ([]GetStatsByScenarioRow, error) {
+	rows, err := q.db.QueryContext(ctx, getStatsByScenario)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetStatsByScenarioRow
+	for rows.Next() {
+		var i GetStatsByScenarioRow
+		if err := rows.Scan(
+			&i.Scenario,
+			&i.CaptureCount,
+			&i.TotalFileSize,
+			&i.TotalPackets,
+			&i.AvgPacketRate,
+			&i.AvgPacketSize,
+			&i.TotalDurationSeconds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSummary = `-- name: GetSummary :one
+SELECT 
+    COUNT(DISTINCT c.id) as total_captures,
+    COUNT(DISTINCT cs.id) as captures_with_stats,
+    SUM(c.file_size) as total_file_size,
+    SUM(COALESCE(cs.packet_count, 0)) as total_packets,
+    AVG(COALESCE(cs.packet_rate, 0)) as avg_packet_rate,
+    AVG(COALESCE(cs.avg_packet_size, 0)) as avg_packet_size,
+    SUM(COALESCE(cs.duration_seconds, 0)) as total_duration_seconds,
+    COUNT(DISTINCT c.hostname) as unique_hostnames,
+    COUNT(DISTINCT c.scenario) as unique_scenarios
+FROM captures c
+LEFT JOIN capture_stats cs ON c.id = cs.capture_id
+`
+
+type GetSummaryRow struct {
+	TotalCaptures        int64
+	CapturesWithStats    int64
+	TotalFileSize        sql.NullFloat64
+	TotalPackets         sql.NullFloat64
+	AvgPacketRate        sql.NullFloat64
+	AvgPacketSize        sql.NullFloat64
+	TotalDurationSeconds sql.NullFloat64
+	UniqueHostnames      int64
+	UniqueScenarios      int64
+}
+
+func (q *Queries) GetSummary(ctx context.Context) (GetSummaryRow, error) {
+	row := q.db.QueryRowContext(ctx, getSummary)
+	var i GetSummaryRow
+	err := row.Scan(
+		&i.TotalCaptures,
+		&i.CapturesWithStats,
+		&i.TotalFileSize,
+		&i.TotalPackets,
+		&i.AvgPacketRate,
+		&i.AvgPacketSize,
+		&i.TotalDurationSeconds,
+		&i.UniqueHostnames,
+		&i.UniqueScenarios,
+	)
+	return i, err
 }

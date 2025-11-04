@@ -13,14 +13,16 @@ import (
 // Health & Status Operations
 
 func (s *Server) HealthHandler(w http.ResponseWriter, r *http.Request) {
-	if s.cfg.LogLevel == "info" {
+	cfg := s.GetConfig()
+	if cfg.LogLevel == "info" {
 		s.logger.Info("Health check requested")
 	}
 	jsonResponse(w, http.StatusOK, HealthRes{Status: "healthy"})
 }
 
 func (s *Server) StatusHandler(w http.ResponseWriter, r *http.Request) {
-	if s.cfg.LogLevel == "info" {
+	cfg := s.GetConfig()
+	if cfg.LogLevel == "info" {
 		s.logger.Info("Status check requested")
 	}
 	percentages, cpuErr := cpu.Percent(0, true)
@@ -36,7 +38,7 @@ func (s *Server) StatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	diskInfos, pathErr := utils.GetAllDisksFromConfig(s.cfg.ArchiveDir, s.cfg.OrganizedDir, s.cfg.WatchDir)
+	diskInfos, pathErr := utils.GetAllDisksFromConfig(cfg.ArchiveDir, cfg.OrganizedDir, cfg.WatchDir)
 	if pathErr != nil {
 		s.logger.Error("Failed to determine disk paths from config", "error", pathErr)
 		jsonResponse(w, http.StatusInternalServerError, StatusRes{Status: "error"})
@@ -81,7 +83,8 @@ func (s *Server) StatusHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) VersionHandler(w http.ResponseWriter, r *http.Request) {
-	if s.cfg.LogLevel == "info" {
+	cfg := s.GetConfig()
+	if cfg.LogLevel == "info" {
 		s.logger.Info("Version check requested")
 	}
 	jsonResponse(w, http.StatusOK, VersionRes{Version: pkg.Version})

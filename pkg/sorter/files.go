@@ -14,7 +14,7 @@ import (
 	"github.com/stefanistkuhl/i-would-never-extend-exercises-itsi-y4-ex2/pkg/db"
 )
 
-func (s *Server) GetFiles(w http.ResponseWriter, r *http.Request) {
+func (s *Server) GetFilesHandler(w http.ResponseWriter, r *http.Request) {
 	store, dbErr := db.InitIfNeeded()
 	if dbErr != nil {
 		s.logger.Error("Failed to initialize database", "error", dbErr)
@@ -38,7 +38,7 @@ func (s *Server) GetFiles(w http.ResponseWriter, r *http.Request) {
 	w.Write(caps)
 }
 
-func (s *Server) GetFile(w http.ResponseWriter, r *http.Request) {
+func (s *Server) GetFileHandler(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	captureID, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
@@ -75,7 +75,7 @@ func (s *Server) GetFile(w http.ResponseWriter, r *http.Request) {
 	w.Write(captureJSON)
 }
 
-func (s *Server) DeleteFile(w http.ResponseWriter, r *http.Request) {
+func (s *Server) DeleteFileHandler(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	captureID, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {

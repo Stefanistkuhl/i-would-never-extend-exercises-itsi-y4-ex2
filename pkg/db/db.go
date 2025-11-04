@@ -112,3 +112,7 @@ func (s *Store) InsertCaptureWithStats(ctx context.Context,
 
 	return captureID, nil
 }
+
+func (s *Store) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return s.db.QueryContext(ctx, query, args...)
+}
