@@ -1,6 +1,8 @@
 watch_dir = './data/captures/incoming'
 organized_dir = './data/captures/organized'
 archive_dir = './data/captures/archive'
+expose_service = true
+port = 1234
 compression_enabled = true
 archive_days = 1
 max_retention_days = 90

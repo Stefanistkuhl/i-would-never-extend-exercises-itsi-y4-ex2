@@ -10,6 +10,8 @@ type Config struct {
 	WatchDir           string `toml:"watch_dir"`
 	OrganizedDir       string `toml:"organized_dir"`
 	ArchiveDir         string `toml:"archive_dir"`
+	ExposeService      bool   `toml:"expose_service"`
+	Port               int    `toml:"port"`
 	CompressionEnabled bool   `toml:"compression_enabled"`
 	ArchiveDays        int    `toml:"archive_days"`
 	MaxRetentionDays   int    `toml:"max_retention_days"`
@@ -20,6 +22,8 @@ func (c Config) FromDB(dbCfg sqlc.Config) Config {
 	return Config{
 		WatchDir:           dbCfg.WatchDir.String,
 		OrganizedDir:       dbCfg.OrganizedDir.String,
+		ExposeService:      dbCfg.ExposeService.Bool,
+		Port:               int(dbCfg.Port.Int64),
 		ArchiveDir:         dbCfg.ArchiveDir.String,
 		CompressionEnabled: dbCfg.CompressionEnabled.Bool,
 		ArchiveDays:        int(dbCfg.ArchiveDays.Int64),
@@ -33,6 +37,8 @@ func (c Config) ToUpdateParams() sqlc.UpdateConfigParams {
 		WatchDir:           sql.NullString{String: c.WatchDir, Valid: c.WatchDir != ""},
 		OrganizedDir:       sql.NullString{String: c.OrganizedDir, Valid: c.OrganizedDir != ""},
 		ArchiveDir:         sql.NullString{String: c.ArchiveDir, Valid: c.ArchiveDir != ""},
+		ExposeService:      sql.NullBool{Bool: c.ExposeService, Valid: true},
+		Port:               sql.NullInt64{Int64: int64(c.Port), Valid: c.Port >= 1024 && c.Port <= 65536},
 		CompressionEnabled: sql.NullBool{Bool: c.CompressionEnabled, Valid: true},
 		ArchiveDays:        sql.NullInt64{Int64: int64(c.ArchiveDays), Valid: c.ArchiveDays > 0},
 		MaxRetentionDays:   sql.NullInt64{Int64: int64(c.MaxRetentionDays), Valid: c.MaxRetentionDays > 0},

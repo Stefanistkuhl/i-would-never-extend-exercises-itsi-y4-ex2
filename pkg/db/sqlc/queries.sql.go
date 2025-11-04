@@ -95,7 +95,7 @@ func (q *Queries) GetCapturesForArchiveWithLimit(ctx context.Context, datetime i
 }
 
 const getConfig = `-- name: GetConfig :one
-SELECT watch_dir, organized_dir, archive_dir, compression_enabled, archive_days, max_retention_days, log_level FROM config LIMIT 1
+SELECT watch_dir, organized_dir, archive_dir, expose_service, port, compression_enabled, archive_days, max_retention_days, log_level FROM config LIMIT 1
 `
 
 func (q *Queries) GetConfig(ctx context.Context) (Config, error) {
@@ -105,6 +105,8 @@ func (q *Queries) GetConfig(ctx context.Context) (Config, error) {
 		&i.WatchDir,
 		&i.OrganizedDir,
 		&i.ArchiveDir,
+		&i.ExposeService,
+		&i.Port,
 		&i.CompressionEnabled,
 		&i.ArchiveDays,
 		&i.MaxRetentionDays,
@@ -318,6 +320,8 @@ UPDATE config
 SET watch_dir = ?,
 organized_dir = ?,
 archive_dir = ?,
+expose_service = ?,
+port = ?,
 compression_enabled = ?,
 archive_days = ?,
 max_retention_days = ?,
@@ -328,6 +332,8 @@ type UpdateConfigParams struct {
 	WatchDir           sql.NullString
 	OrganizedDir       sql.NullString
 	ArchiveDir         sql.NullString
+	ExposeService      sql.NullBool
+	Port               sql.NullInt64
 	CompressionEnabled sql.NullBool
 	ArchiveDays        sql.NullInt64
 	MaxRetentionDays   sql.NullInt64
@@ -339,6 +345,8 @@ func (q *Queries) UpdateConfig(ctx context.Context, arg UpdateConfigParams) erro
 		arg.WatchDir,
 		arg.OrganizedDir,
 		arg.ArchiveDir,
+		arg.ExposeService,
+		arg.Port,
 		arg.CompressionEnabled,
 		arg.ArchiveDays,
 		arg.MaxRetentionDays,

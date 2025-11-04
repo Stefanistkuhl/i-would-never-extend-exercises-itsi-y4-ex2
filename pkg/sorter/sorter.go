@@ -46,6 +46,7 @@ func StartSorter() {
 		lg.Fatal("Failed to initially check for pending archive tasks", "error", err)
 	}
 
+	go startHTTPServer(lg, cfg)
 	go am.StartPeriodicCheck()
 	Watcher(cfg, lg)
 }

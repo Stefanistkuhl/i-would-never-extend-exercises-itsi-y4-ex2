@@ -45,6 +45,8 @@ type Config struct {
 	WatchDir           sql.NullString
 	OrganizedDir       sql.NullString
 	ArchiveDir         sql.NullString
+	ExposeService      sql.NullBool
+	Port               sql.NullInt64
 	CompressionEnabled sql.NullBool
 	ArchiveDays        sql.NullInt64
 	MaxRetentionDays   sql.NullInt64

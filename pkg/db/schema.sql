@@ -35,6 +35,8 @@ create table config (
 	watch_dir text default './data/captures/incoming',
 	organized_dir text default './data/captures/organized',
 	archive_dir text default './data/captures/archive',
+	expose_service boolean default 0,
+	port integer default 13173 check(port >= 1024 and port <= 65536),
 	compression_enabled boolean default 1,
 	archive_days integer default 30,
 	max_retention_days integer default 90,
