@@ -1,6 +1,6 @@
 module github.com/stefanistkuhl/i-would-never-extend-exercises-itsi-y4-ex2
 
-go 1.25.3
+go 1.24.9
 
 require (
 	github.com/charmbracelet/lipgloss v1.1.0
