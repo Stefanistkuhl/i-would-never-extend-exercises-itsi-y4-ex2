@@ -55,11 +55,34 @@ func ValidateFilename(filePath string, cfg config.Config, logger logger.Logger) 
 	result := FilenameValidationResult{IsValid: false}
 	filename := filepath.Base(filePath)
 
-	// Remove .pcap or .pcap.gz extension
+	// Skip directories and hidden files
+	if filename == "" || strings.HasPrefix(filename, ".") {
+		result.Error = "Invalid filename: empty or hidden"
+		return result
+	}
+
+	if strings.HasSuffix(filename, ".INCORRECT") {
+		result.Error = "Already marked as incorrect"
+		return result
+	}
+
+	// Remove extensions in order: .gz, .pcapng, .pcap
 	base := strings.TrimSuffix(
-		strings.TrimSuffix(filename, ".gz"),
+		strings.TrimSuffix(
+			strings.TrimSuffix(filename, ".gz"),
+			".pcapng"),
 		".pcap",
 	)
+
+	if base == filename {
+		newPath := filePath + ".INCORRECT"
+		os.Rename(filePath, newPath)
+		result.Error = "No valid pcap extension found"
+		if cfg.LogLevel == "info" {
+			logger.Info("Renamed file - no pcap extension", "from", filePath, "to", newPath)
+		}
+		return result
+	}
 
 	// Regex: {hostname}_{scenario}_{YYYYMMDD_HHmmss}
 	re := regexp.MustCompile(`^\{([a-zA-Z0-9_-]+)\}_\{([a-zA-Z0-9_-]+)\}_\{(\d{8})_(\d{6})\}$`)
@@ -67,8 +90,7 @@ func ValidateFilename(filePath string, cfg config.Config, logger logger.Logger) 
 
 	if len(matches) != 5 {
 		newPath := filePath + ".INCORRECT"
-		err := os.Rename(filePath, newPath)
-		if err != nil {
+		if err := os.Rename(filePath, newPath); err != nil {
 			result.Error = "Failed to rename file: " + err.Error()
 			logger.Error("Failed to rename file", "from", filePath, "to", newPath, "error", err)
 			return result
@@ -83,10 +105,20 @@ func ValidateFilename(filePath string, cfg config.Config, logger logger.Logger) 
 
 	result.Hostname = matches[1]
 	result.Scenario = matches[2]
-	dateStr := matches[3] // YYYYMMDD
-	timeStr := matches[4] // HHmmss
+	dateStr := matches[3]
+	timeStr := matches[4]
 
-	// Parse datetime: YYYYMMDD + HHmmss
+	// Validate date/time format (basic sanity check)
+	if !isValidDatetime(dateStr, timeStr) {
+		newPath := filePath + ".INCORRECT"
+		os.Rename(filePath, newPath)
+		result.Error = "Invalid datetime values"
+		if cfg.LogLevel == "info" {
+			logger.Info("Renamed file - invalid datetime", "from", filePath, "to", newPath)
+		}
+		return result
+	}
+
 	datetimeStr := dateStr + timeStr
 	captureDateTime, err := time.Parse("20060102150405", datetimeStr)
 	if err != nil {
@@ -106,6 +138,37 @@ func ValidateFilename(filePath string, cfg config.Config, logger logger.Logger) 
 	}
 
 	return result
+}
+
+func isValidDatetime(dateStr, timeStr string) bool {
+	if len(dateStr) != 8 || len(timeStr) != 6 {
+		return false
+	}
+
+	month := dateStr[4:6]
+	day := dateStr[6:8]
+
+	hour := timeStr[0:2]
+	min := timeStr[2:4]
+	sec := timeStr[4:6]
+
+	if month < "01" || month > "12" {
+		return false
+	}
+	if day < "01" || day > "31" {
+		return false
+	}
+	if hour > "23" {
+		return false
+	}
+	if min > "59" {
+		return false
+	}
+	if sec > "59" {
+		return false
+	}
+
+	return true
 }
 
 func processFile(cfg config.Config, path string, logger logger.Logger) {
