@@ -67,12 +67,8 @@ func ValidateFilename(filePath string, cfg config.Config, logger logger.Logger) 
 	}
 
 	// Remove extensions in order: .gz, .pcapng, .pcap
-	base := strings.TrimSuffix(
-		strings.TrimSuffix(
-			strings.TrimSuffix(filename, ".gz"),
-			".pcapng"),
-		".pcap",
-	)
+	pcapRegex := regexp.MustCompile(`\.pcap(ng)?\d*(?:\.gz)?$`)
+	base := pcapRegex.ReplaceAllString(filename, "")
 
 	if base == filename {
 		newPath := filePath + ".INCORRECT"

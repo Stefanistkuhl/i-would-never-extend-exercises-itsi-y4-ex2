@@ -38,3 +38,8 @@ logs/
 .env
 COMMANDS.md
 ENDPOINTS.md
+
+*.pcap
+*.pcapng
+*.pcap.gz
+*.gz
