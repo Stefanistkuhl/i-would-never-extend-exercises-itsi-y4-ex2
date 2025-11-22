@@ -2,6 +2,7 @@ package capture
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/stefanistkuhl/i-would-never-extend-exercises-itsi-y4-ex2/pkg/config"
@@ -117,5 +118,41 @@ func AnalyzeCaptureFile(cfg config.Config, filePath string) (CaptureStats, error
 		stats.PacketRate = float64(totalPackets)
 	}
 
+	stats.TopTCPSrcPorts = limitTopPorts(stats.TopTCPSrcPorts, 10)
+	stats.TopTCPDstPorts = limitTopPorts(stats.TopTCPDstPorts, 10)
+	stats.TopUDPSrcPorts = limitTopPorts(stats.TopUDPSrcPorts, 10)
+	stats.TopUDPDstPorts = limitTopPorts(stats.TopUDPDstPorts, 10)
+
 	return stats, nil
+}
+
+func limitTopPorts(src map[uint16]int, limit int) map[uint16]int {
+	if len(src) <= limit {
+		return src
+	}
+
+	type portStat struct {
+		port  uint16
+		count int
+	}
+
+	stats := make([]portStat, 0, len(src))
+	for port, count := range src {
+		stats = append(stats, portStat{port: port, count: count})
+	}
+
+	sort.Slice(stats, func(i, j int) bool {
+		if stats[i].count == stats[j].count {
+			return stats[i].port < stats[j].port
+		}
+		return stats[i].count > stats[j].count
+	})
+
+	trimmed := make(map[uint16]int, limit)
+	for idx := 0; idx < limit && idx < len(stats); idx++ {
+		entry := stats[idx]
+		trimmed[entry.port] = entry.count
+	}
+
+	return trimmed
 }

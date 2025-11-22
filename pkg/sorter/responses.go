@@ -90,8 +90,8 @@ type FileStatsRes struct {
 	FilePath             string         `json:"file_path"`
 	PacketCount          *int64         `json:"packet_count,omitempty"`
 	ProtocolDistribution map[string]int `json:"protocol_distribution,omitempty"`
-	TopSrcIps            []string       `json:"top_src_ips,omitempty"`
-	TopDstIps            []string       `json:"top_dst_ips,omitempty"`
+	TopSrcIps            map[string]int `json:"top_src_ips,omitempty"`
+	TopDstIps            map[string]int `json:"top_dst_ips,omitempty"`
 	TopTcpSrcPorts       map[string]int `json:"top_tcp_src_ports,omitempty"`
 	TopTcpDstPorts       map[string]int `json:"top_tcp_dst_ports,omitempty"`
 	TopUdpSrcPorts       map[string]int `json:"top_udp_src_ports,omitempty"`

@@ -5,12 +5,15 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stefanistkuhl/i-would-never-extend-exercises-itsi-y4-ex2/pkg/db"
 )
+
+const defaultTopLimit = 10
 
 func (s *Server) GetSummaryHandler(w http.ResponseWriter, r *http.Request) {
 	store, err := db.InitIfNeeded()
@@ -111,14 +114,14 @@ func (s *Server) GetFileStatsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if statsRow.TopSrcIps.Valid && statsRow.TopSrcIps.String != "" {
-		var topSrcIps []string
+		var topSrcIps map[string]int
 		if err := json.Unmarshal([]byte(statsRow.TopSrcIps.String), &topSrcIps); err == nil {
 			result.TopSrcIps = topSrcIps
 		}
 	}
 
 	if statsRow.TopDstIps.Valid && statsRow.TopDstIps.String != "" {
-		var topDstIps []string
+		var topDstIps map[string]int
 		if err := json.Unmarshal([]byte(statsRow.TopDstIps.String), &topDstIps); err == nil {
 			result.TopDstIps = topDstIps
 		}
@@ -151,6 +154,14 @@ func (s *Server) GetFileStatsHandler(w http.ResponseWriter, r *http.Request) {
 			result.TopUdpDstPorts = topUdpDstPorts
 		}
 	}
+
+	topLimit := resolveTopLimit(r)
+	result.TopSrcIps = limitStatMap(result.TopSrcIps, topLimit)
+	result.TopDstIps = limitStatMap(result.TopDstIps, topLimit)
+	result.TopTcpSrcPorts = limitStatMap(result.TopTcpSrcPorts, topLimit)
+	result.TopTcpDstPorts = limitStatMap(result.TopTcpDstPorts, topLimit)
+	result.TopUdpSrcPorts = limitStatMap(result.TopUdpSrcPorts, topLimit)
+	result.TopUdpDstPorts = limitStatMap(result.TopUdpDstPorts, topLimit)
 
 	jsonResponse(w, http.StatusOK, result)
 }
@@ -222,4 +233,48 @@ func getFloatValue(v sql.NullFloat64) float64 {
 		return v.Float64
 	}
 	return 0
+}
+
+func resolveTopLimit(r *http.Request) int {
+	limitParam := r.URL.Query().Get("top_limit")
+	if limitParam == "" {
+		return defaultTopLimit
+	}
+
+	limit, err := strconv.Atoi(limitParam)
+	if err != nil || limit <= 0 {
+		return defaultTopLimit
+	}
+
+	return limit
+}
+
+func limitStatMap(src map[string]int, limit int) map[string]int {
+	if src == nil || limit <= 0 || len(src) <= limit {
+		return src
+	}
+
+	type entry struct {
+		key   string
+		value int
+	}
+
+	entries := make([]entry, 0, len(src))
+	for k, v := range src {
+		entries = append(entries, entry{key: k, value: v})
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].value == entries[j].value {
+			return entries[i].key < entries[j].key
+		}
+		return entries[i].value > entries[j].value
+	})
+
+	trimmed := make(map[string]int, limit)
+	for i := 0; i < limit && i < len(entries); i++ {
+		trimmed[entries[i].key] = entries[i].value
+	}
+
+	return trimmed
 }
